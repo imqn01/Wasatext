@@ -1,0 +1,698 @@
+openapi: 3.0.3
+info:
+  title: Simplified login API specification
+  description: |
+    This OpenAPI document describes the simplified login API.
+    Copy and paste the API from the `paths` key to your OpenAPI document.
+  version: "1"
+paths:
+  /session:
+    post:
+      tags: ["login"]
+      summary: Logs in the user
+      description: |  
+        If the user does not exist, it will be created,
+        and an identifier is returned.
+        If the user exists, the user identifier is returned.
+      operationId: doLogin
+      requestBody:
+        description: User details
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/userName"
+      responses: 
+        "201":
+          description: User log-in action successful
+          content:
+            application/json: 
+              schema:
+                type: object
+                properties:
+                  identifier:
+                    type: string
+                    example: "abcdef012345"
+  /users:
+    put: 
+      tags: ["user"]
+      summary: Username update
+      description: |
+        Updates username to a new username as long as the new name is not already in use. 
+      operationId: setMyUserName
+      requestBody:
+        description: New username
+        required: true  
+        content: 
+          application/json: 
+            schema:  
+              $ref: "#/components/schemas/userName"
+      responses: 
+        "200": 
+          description: New user name has been successfully updated
+          content: 
+            application/json:
+              schema: 
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message: 
+                    type: string 
+                    example: "New user name has been successfully"
+        "409": # 409 = conflict, it is a username conflict
+          description: The username is already taken 
+          content: 
+            application/json: 
+              schema: 
+                type: object
+                properties: 
+                  success: 
+                    type: boolean
+                    example: false
+                  message:
+                    type: string
+                    example: "The username is already taken"
+  #conversation: list, timestamp, preview, photo
+  /conversations:
+    get: 
+      tags: ["conversations"]
+      summary: Get the list of conversations 
+      description: |
+        Get the list of conversations, both with single users and group users in reverse chronological order. 
+      operationId: getMyConversations
+      responses:
+        "200":
+          description: Conversation list successfully returned. 
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    conversationId:
+                      type: integer
+                      example: 12345
+                    name:
+                      type: string
+                      description: "Username or groupname."
+                      example: "JaneDoe"
+                    profilePhoto: 
+                      $ref: "#/components/schemas/profilePhoto"
+                    timestampLastMessage:
+                      type: string
+                      format: date-time #Todo: Vil jeg ha en annen timestamp?
+                      example: "2023-10-05T14:48:00.000Z"
+                    previewLastMessage:
+                      type: string
+                      description: "Icon or text snippet representation of the last message sent in the conversation."
+                      example: "Hey, are you going to Blue Bar tonight<3?"
+                    isGroup:
+                      type: boolean
+                      description: "Indication for group converastions."
+                      example: false
+
+  #getConversation - rerturn a single conversation from the list
+  /conversations/{conversationId}:
+    get: 
+      tags: ["conversations"]
+      summary: Get a singular conversation.
+      description: Get a conversation between the logged in user and another user or a group. All messages included in reverse chronological order. 
+      operationId: getConversation
+      parameters: 
+        - $ref: '#/components/parameters/ConversationId'
+      responses: 
+        "200":
+          description: Successfully retrived the conversation. 
+          content: 
+            application/json: 
+              schema: 
+                type: object
+                properties: 
+                  conversationId: 
+                    type: integer
+                    example: 12345
+                  name: 
+                    type: string
+                    description: Groupname or username 
+                    example: "JaneDoe"
+                  isGroup:
+                    type: boolean
+                    description: "Indication for group conversations"
+                    example: false
+                  messages: 
+                    type: array
+                    description: List of messages in conversation.
+                    items: 
+                      type: object
+                      properties: 
+                        messageId:
+                          type: integer
+                          example: 12345
+                        sender:
+                          type: string
+                          description: "The senders username"
+                          example: "JohnDoe"
+                        timestamp: 
+                          type: string
+                          format: date-time
+                          example: "2023-10-05T14:48:00.000Z"
+                        content: 
+                          type: string 
+                          description: The text message or the photo.
+                          example: "I'm going to Scholars instead"
+                        status: 
+                          type: string 
+                          enum: ["read", "sent", "received"]
+                          description: "Message statuses"
+                          example: "sent"
+                        reactions: 
+                          type: array #Flere reaksjoner på en melding i en gruppesamtale, men kun 1 eller 2 i egen samtale
+                          #todo: skal jeg selv kunne reagere på egne meldinger? 
+                          description: "List of reactions for the message"
+                          items:
+                            type: object
+                            properties: 
+                              user: 
+                                type: string
+                                example: "OlaNordmann"
+                              reaction: 
+                                type: string 
+                                example: "👍️"
+                                   
+#sendMessage: Make a new message, new message ID, send it to a conversationID. 
+#will add the message to the conversation list between two users. 
+#a stack situastion - no. Lists are better. 
+#should i make a message compoment ? 
+#should i make other compoments? 
+
+#Each message: 
+#- timestamp
+# content (text / photo)
+#senders username
+#message status - checkmark 
+#reactions? 
+
+# responses 
+# sent 
+# unable to send ? but why would this happen?
+  /conversations/{conversationId}/messages:
+    post: 
+      tags: ["conversations"]
+      summary: Send a singular message. 
+      description: Sends a message to another user or a group the user is a part of. The message could be text or a photo. The conversation list will be updated with the last message as a preview.
+      operationId: sendMessage
+      parameters: 
+        - $ref: '#/components/parameters/ConversationId'
+      requestBody: 
+        description: Message details, including the sender, content, type, and timestamp.
+        required: true
+        content: 
+          application/json:
+            schema: 
+              type: object 
+              properties: 
+                senderId: 
+                  type: string
+                  description: The unique ID of the user sending the message.
+                  example: "JaneDoe"
+                content: 
+                  type: string 
+                  description: Text content or photo URL of the message.
+                  example: "Hi, how was your day?"
+                type: 
+                  type: string
+                  description: The type of message being sent.
+                  enum: ["text", "photo"]
+                  example: "text"
+      responses:
+        "201":
+          description: Message successfully sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messageId:
+                    type: integer
+                    description: The unique ID of the newly created message.
+                    example: 67890
+                  conversationId:
+                    type: integer
+                    description: The ID of the conversation where the message was sent.
+                    example: 12345
+                  senderId:
+                    type: string
+                    description: The unique ID of the sender.
+                    example: "user_1"
+                  content:
+                    type: string
+                    description: The text content or URL for a photo message.
+                    example: "Hello, how are you?"
+                  type:
+                    type: string
+                    description: The type of the message (text or photo).
+                    example: "text"
+                  timestamp:
+                    type: string
+                    format: date-time
+                    description: Timestamp of when the message was sent.
+                    example: "2024-11-07T14:48:00.000Z"
+                  status:
+                    type: string
+                    description: Message status indicator (e.g., sent, received, read).
+                    enum: ["sent", "received", "read"]
+                    example: "sent"
+                  reactions:
+                    type: array
+                    description: List of reactions on the message, if any.
+                    items:
+                      type: object
+                      properties:
+                        userId:
+                          type: string
+                          description: ID of the user who reacted.
+                          example: "user_2"
+                        reaction:
+                          type: string
+                          description: The reaction emoticon.
+                          example: "👍️"
+  #forward messages 
+  # the creators name, timestamp and message. 
+  /conversations/{conversationId}/messages/forward:
+    post: 
+      tags: ["conversations"]
+      summary: Forward a messag to another user
+      description: A user can forward another users message to another user.
+      operationId: forwardMessage
+      parameters: 
+        - name: conversationId
+          in: path
+          description: The unique conversation id to forward the message to
+          required: true
+          schema: 
+            type: integer
+            example: 12345
+        - name: messageId
+          in: query
+          description: Message id to be forwarded
+          required: true
+          schema: 
+            type: integer 
+            example: 12345
+      requestBody: 
+        description: Forwarding details
+        required: true
+        content: 
+          application/json:
+            schema:
+              type: object
+              properties: 
+                senderId:
+                  type: string
+                  description: Unique id of the user forwarding the message.
+                  example: "JohnDoe"
+                content: 
+                  type: string 
+                  description: The forwarded message content. The same as the original message. 
+                  example: "Hi, how are you"
+                type:
+                  type: string
+                  description: The type of message being forwarded (text or photo).
+                  enum: ["text", "photo"]
+                  example: "text"
+                originalMessage:
+                  type: object
+                  description: Details about the original message being forwarded.
+                  properties:
+                    messageId:
+                      type: integer
+                      description: The ID of the original message being forwarded.
+                      example: 67890
+                    originalConversationId:
+                      type: integer
+                      description: The conversation where the original message belongs.
+                      example: 54321
+              
+      responses:
+        "201":
+          description: Message successfully forwarded.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messageId:
+                    type: integer
+                    description: The unique ID of the newly created forwarded message.
+                    example: 12345
+                  conversationId:
+                    type: integer
+                    description: The ID of the conversation where the forwarded message was sent.
+                    example: 12345
+                  senderId:
+                    type: string
+                    description: The unique ID of the sender.
+                    example: "JaneDoe"
+                  content:
+                    type: string
+                    description: The text content or URL for a photo message.
+                    example: "Hi, how was your day?"
+                  type:
+                    type: string
+                    description: The type of the message (text or photo).
+                    example: "text"
+                  timestamp:
+                    type: string
+                    format: date-time
+                    description: Timestamp of when the forwarded message was sent.
+                    example: "2024-11-07T14:48:00.000Z"
+                  status:
+                    type: string
+                    description: Message status indicator 
+                    enum: ["received", "read"]
+                    example: "received"
+                  reactions:
+                    type: array
+                    description: List of reactions on the forwarded message.
+                    items:
+                      type: object
+                      properties:
+                        userId:
+                          type: string
+                          description: ID of the user who reacted.
+                          example: "user_2"
+                        reaction:
+                          type: string
+                          description: The reaction emoticon.
+                          example: "👍️"
+  /conversations/{conversationId}/messages/{messageId}/comment:
+    post:
+      tags: ["conversations"]
+      summary: React to a message with a comment (emoticon)
+      description: Allows a user to react to a specific message with an emoticon.
+      operationId: commentMessage
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+        - name: messageId
+          in: path
+          description: The unique ID of the message to react to.
+          required: true
+          schema:
+            type: integer
+            example: 12345
+      requestBody:
+        description: Reaction details
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                  description: ID of the user adding the reaction.
+                  example: "user_1"
+                reaction:
+                  type: string
+                  description: The reaction emoticon.
+                  example: "👍️"
+      responses:
+        "201":
+          description: Reaction added successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+
+  /conversations/{conversationId}/messages/{messageId}/uncomment:
+    delete:
+      tags: ["conversations"]
+      summary: Remove a reaction from a message
+      description: Allows a user to delete their reaction (emoticon) from a message.
+      operationId: uncommentMessage
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+        - name: messageId
+          in: path
+          description: The unique ID of the message from which to remove the reaction.
+          required: true
+          schema:
+            type: integer
+            example: 12345
+      responses:
+        "200":
+          description: Reaction removed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+
+  /conversations/{conversationId}/messages/{messageId}:
+    delete:
+      tags: ["conversations"]
+      summary: Delete a specific message
+      description: Allows the sender to delete their message from the conversation.
+      operationId: deleteMessage
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+        - name: messageId
+          in: path
+          description: The unique ID of the message to delete.
+          required: true
+          schema:
+            type: integer
+            example: 12345
+      responses:
+        "200":
+          description: Message deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+
+  /users/search:
+    get:
+      tags: ["user"]
+      summary: Search for users by username
+      description: Allows a user to search for other WASAText users by username.
+      operationId: searchUsers
+      parameters:
+        - name: query
+          in: query
+          description: The username or partial username to search for.
+          required: true
+          schema:
+            type: string
+            example: "Jane"
+      responses:
+        "200":
+          description: List of matching users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    userId:
+                      type: string
+                      example: "JaneDoe"
+                    name:
+                      type: string
+                      example: "Jane Doe"
+                    profilePhoto:
+                      type: string
+                      description: URL of the user's profile photo
+                      example: "https://example.com/janedoe.jpg"
+  /groups:
+      post:
+        tags: ["groups"]
+        summary: Create a new group conversation
+        description: Allows a user to create a new group with other WASAText users.
+        operationId: createGroup
+        requestBody:
+          description: Group creation details
+          required: true
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    description: Group name.
+                    example: "Weekend Plans"
+                  members:
+                    type: array
+                    items:
+                      type: string
+                    description: List of usernames to add to the group.
+                    example: ["user_1", "user_2"]
+        responses:
+          "201":
+            description: Group created successfully
+            content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    groupId:
+                      type: integer
+                      example: 54321
+                    name:
+                      type: string
+                      example: "Weekend Plans"
+
+  /groups/{groupId}/add:
+    post:
+      tags: ["groups"]
+      summary: Add a user to an existing group
+      description: Allows an existing group member to add another user to the group.
+      operationId: addToGroup
+      parameters:
+        - $ref: "#/components/parameters/GroupId"
+      requestBody:
+        description: User details to add to the group
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                  description: ID of the user to add to the group.
+                  example: "newUser"
+      responses:
+        "200":
+          description: User added to group successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+
+  /groups/{groupId}/name:
+    put:
+      tags: ["groups"]
+      summary: Set group name
+      description: Update the name of an existing group.
+      operationId: setGroupName
+      parameters:
+        - $ref: "#/components/parameters/GroupId"
+      requestBody:
+        description: New group name
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/groupName"
+      responses:
+        "200":
+          description: Group name successfully updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Group name has been updated."
+
+  /groups/{groupId}/leave:
+    post:
+      tags: ["groups"]
+      summary: Leave a group conversation
+      description: Allows a user to leave a group they are part of.
+      operationId: leaveGroup
+      parameters:
+        - $ref: "#/components/parameters/GroupId"
+      requestBody:
+        description: User details to leave the group
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                  description: ID of the user leaving the group.
+                  example: "user_1"
+      responses:
+        "200":
+          description: User left group successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+              
+components:
+  schemas: 
+    userName: 
+      type: object 
+      properties: 
+        name: 
+          type: string
+          example: Kaja
+          pattern: 'ˆ.*?$'
+          minLength: 3
+          maxLength: 16
+    groupName:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "Weekend Plans"
+    profilePhoto:
+      type: object
+      properties:
+        photoUrl:
+          type: string
+          description: URL of the profile photo
+          example: "https://example.com/profile.jpg"
+  parameters:
+    ConversationId:
+      name: conversationId
+      in: path
+      description: The unique ID of the conversation.
+      required: true
+      schema:
+        type: integer
+        example: 12345
+    GroupId:
+      name: groupId
+      in: path
+      description: The unique ID of the group.
+      required: true
+      schema:
+        type: integer
+        example: 98765
+
+        
+        
